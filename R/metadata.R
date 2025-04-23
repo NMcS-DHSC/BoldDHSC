@@ -27,6 +27,40 @@ metadata <- function(df,output_file,distinct_limit=8) {
     stop("The excel file: ",output_file," is not able to be edited. Please change file name, or close the file before trying again")
   }
 
+  has_ref_file <- svDialogs::dlg_message(
+    "Do you have a reference file (in the set format)?",
+    type = "yesno"
+  )$res
+
+  ref_data <- NULL  # Initialize
+
+  # 2. If "Yes", let them select the file
+  if (has_ref_file == "yes") {
+    file_path <- svDialogs::dlg_open(
+      title = "Select Reference File",
+      filters = matrix(c("Excel", "*.xlsx;*.xls"), ncol = 2, byrow = TRUE)
+    )$res
+
+    if (length(file_path) > 0) {  # If a file was selected
+      # Read the file
+      ref_data <- readxl::read_excel(file_path,sheet = 2)
+      ref_data_names <- names(ref_data)
+      if(all(ref_data_names!= c("Variable_name","Variable_type","Variable_description"))){
+        ref_data_check <- FALSE
+        svDialogs::dlg_message("Reference data load failed. File not in correct format. Use format from template in this folder",type="ok")
+      }else{
+        ref_data_check <- TRUE
+        message("Reference file loaded successfully!")}
+    } else {
+      message("No file selected.")
+      ref_data_check <- FALSE
+    }
+  } else {
+    message("Proceeding without a reference file.")
+    ref_data_check <- FALSE
+  }
+
+
   if(ncol(df)>100){
     stop("Your dataframe has more than 100 columns. This function will not take a dataframe with more than 100 columns")
   }else if(ncol(df)>50){
@@ -48,25 +82,63 @@ metadata <- function(df,output_file,distinct_limit=8) {
                        } else {
                          paste(unique(na.omit(.x)), collapse = ", ")
                        }
-                     ))) %>%
-                     t() %>%
-                     as.data.frame %>%
-                     tibble::rownames_to_column() %>%
-                     magrittr::set_names("Column_Name","Column_Type","Missing_Values","Non_Missing_Values","Unique_Values","Example_Values"))
+                     ))))
+  data_dict <- as.data.frame(t(data_dict))
+  data_dict <- tibble::rownames_to_column(data_dict)
+  names(data_dict) <- c("Column_Name","Column_Type","Missing_Values","Non_Missing_Values","Unique_Values","Example_Values")
 
   data_dict[["Variable_details"]] <- NA
+
+  if(ref_data_check){
+    data_dict <- dplyr::left_join(data_dict,ref_data,by=c("Column_Name"="Variable_name"))
+    data_dict <- dplyr::mutate(data_dict,Column_Type=ifelse(is.na(Variable_type),Column_Type,Variable_type))
+    data_dict <- dplyr::mutate(data_dict,Variable_details=ifelse(is.na(Variable_description),Variable_details,Variable_description))
+    data_dict <- dplyr::select(data_dict,-Variable_description,-Variable_type)
+  }
+
+  convert_table_types <- function(data, ref_table) {
+    for (col in ref_table$Variable_name) {
+      desired_type <- ref_table$Variable_type[ref_table$Variable_name == col]
+
+      if (col %in% names(data)) {
+        tryCatch({
+          data[[col]] <- switch(
+            desired_type,
+            "integer" = as.integer(data[[col]]),
+            "numeric" = as.numeric(data[[col]]),
+            "character" = as.character(data[[col]]),
+            "factor" = as.factor(data[[col]]),
+            "logical" = as.logical(data[[col]]),
+            "date" = as.Date(data[[col]]),
+            data[[col]]  # Default: no conversion if type not recognized
+          )
+        }, warning = function(w) {
+          message(sprintf("Warning converting %s to %s: %s", col, desired_type, w$message))
+        }, error = function(e) {
+          message(sprintf("Failed to convert %s to %s: %s", col, desired_type, e$message))
+        })
+      } else {
+        message(sprintf("Column %s not found in data", col))
+      }
+    }
+    return(data)
+  }
+
+  df <- convert_table_types(df,ref_data)
 
   # Loop through each row
   for (i in 1:nrow(data_dict)) {
     # Show the current row data (optional)
-    cat("\nCurrent row:\n")
-    print(data_dict[i,1 ])
+    if(is.na(data_dict[i, "Variable_details"])){
+      cat("\nCurrent row:\n")
+      print(data_dict[i,1 ])
 
-    # Prompt user for input
-    user_input <- readline(prompt = paste0("Variable info for: ", data_dict[i,1], ": "))
+      # Prompt user for input
+      user_input <- readline(prompt = paste0("Variable info for: ", data_dict[i,1], ": "))
 
-    # Store the input
-    data_dict[i, "Variable_details"] <- user_input
+      # Store the input
+      data_dict[i, "Variable_details"] <- user_input
+    }
   }
 
 
@@ -84,12 +156,26 @@ metadata <- function(df,output_file,distinct_limit=8) {
     factor_dicts[[col]] <- factor_df
   }
 
+  max_chars <- sapply(data_dict, function(col) {
+      max(nchar(gsub("[[:punct:]]", "",as.character(col))), na.rm = TRUE)
+  })
+
+  column_widths <- ifelse(max_chars<10,16,max_chars*1.2)
   # Create Excel workbook with formatting
   wb <- openxlsx::createWorkbook()
 
+  names(data_dict) <- c("Variable Name",
+                        "Variable Type",
+                        "Missing values",
+                        "Non Missing",
+                        "Unique Values",
+                        "Example values",
+                        "Variable Description")
+
   # Add main dictionary sheet (red tab)
   openxlsx::addWorksheet(wb, "Data Dictionary")
-  openxlsx::writeData(wb, "Data Dictionary", data_dict)
+  openxlsx::writeDataTable(wb, "Data Dictionary", data_dict)
+  openxlsx::setColWidths(wb, "Data Dictionary",widths = column_widths,cols = 1:7)
 
   # Style definitions
   header_style <- openxlsx::createStyle(
@@ -142,7 +228,7 @@ metadata <- function(df,output_file,distinct_limit=8) {
       wb,
       sheet_name,
       style = outer_border_style,
-      rows = current_row:(current_row + nrow(factor_dicts[[col_name]]) - 1),
+      rows = current_row:(current_row + nrow(factor_dicts[[col_name]])),
       cols = 1:ncol(factor_dicts[[col_name]]),
       gridExpand = TRUE
     )
@@ -151,13 +237,13 @@ metadata <- function(df,output_file,distinct_limit=8) {
       wb,
       sheet_name,
       style = body_style,
-      rows = (current_row + 1):(current_row + nrow(factor_dicts[[col_name]]) - 1),
+      rows = (current_row + 1):(current_row + nrow(factor_dicts[[col_name]]) ),
       cols = 1:ncol(factor_dicts[[col_name]]),
       gridExpand = TRUE
     )
 
-    # Update current_row to be 5 rows below the bottom of this table
-    current_row <- current_row + nrow(factor_dicts[[col_name]]) + 5
+    # Update current_row to be 3 rows below the bottom of this table
+    current_row <- current_row + nrow(factor_dicts[[col_name]]) + 3
   }
 
   # Save workbook
