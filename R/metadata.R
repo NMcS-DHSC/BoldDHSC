@@ -2,12 +2,13 @@
 #'
 #' The function creates an excel summary of the dataframe, including missingness, example values, type of column.
 #' It also requires the user to input the description for each column.
+#' This can either be done in-line as the function runs, or can be uploaded as part of a reference date sheet
 #' The file outputted also contains a sheet for the user to explicitly add value to factor columns.
 #'
 #' @param df A dataframe, ideally of less than 50 columns
 #' @param output_file The filepath of the output xlsx file
 #' @param distinct_limit The limit on distinct values to use to determine if a column is a factor column. If the number of unique values in a column is less than distinct_limit, it will be assumed the column is a factor.
-#' @returns An xlsx document which is saved in the working directory. The first sheet is a summary of all of the columns in the data, and each following sheet are blank tables for users to detail the factor columns.
+#' @returns An xlsx document which is saved in the working directory. The first sheet is a summary of all of the columns in the data, and the second sheet is a lookup for each of the factors.
 #' @examples
 #' metadata(mtcars,"Example_output.xlsx",distinct_limit = 4)
 #'
@@ -250,5 +251,3 @@ metadata <- function(df,output_file,distinct_limit=8) {
   openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
   message(paste("Dictionary saved to:", output_file))
 }
-
-metadata(mtcars,"example.xlsx",4)
