@@ -1,0 +1,168 @@
+#' Create an Excel data dictionary from a dataframe
+#'
+#' The function creates an excel summary of the dataframe, including missingness, example values, type of column.
+#' It also requires the user to input the description for each column.
+#' The file outputted also contains a sheet for the user to explicitly add value to factor columns.
+#'
+#' @param df A dataframe, ideally of less than 50 columns
+#' @param output_file The filepath of the output xlsx file
+#' @param distinct_limit The limit on distinct values to use to determine if a column is a factor column. If the number of unique values in a column is less than distinct_limit, it will be assumed the column is a factor.
+#' @returns An xlsx document which is saved in the working directory. The first sheet is a summary of all of the columns in the data, and each following sheet are blank tables for users to detail the factor columns.
+#' @examples
+#' metadata(mtcars,"Example_output.xlsx",distinct_limit = 4)
+#'
+metadata <- function(df,output_file,distinct_limit=8) {
+
+  if(substr(output_file,nchar(output_file)-4,nchar(output_file))!=".xlsx"){
+    stop("The file name (output_file) must be a .xlsx file")
+  }
+
+  suppressWarnings(check <- if(!file.exists(output_file)){TRUE}else{
+    tryCatch({
+      wb <- openxlsx::loadWorkbook(output_file)  # Fails if read-only
+      TRUE}, error = function(e) FALSE)
+  }
+  )
+  if(!check){
+    stop("The excel file: ",output_file," is not able to be edited. Please change file name, or close the file before trying again")
+  }
+
+  if(ncol(df)>100){
+    stop("Your dataframe has more than 100 columns. This function will not take a dataframe with more than 100 columns")
+  }else if(ncol(df)>50){
+    message("Your dataframe has between 50 and 100 columns. This process will still work, but will look messy")
+  }
+
+  df <- dplyr::mutate(df,across(
+      .cols = where(~dplyr::n_distinct(.) < distinct_limit),
+      .fns = as.factor
+    ))
+
+  suppressWarnings(data_dict <- dplyr::summarise(df, across(everything(), ~ list(
+                       type = class(.x),
+                       n_missing = sum(is.na(.x)),
+                       n_available = sum(!is.na(.x)),
+                       n_unique = dplyr::n_distinct(.x),
+                       example = if (dplyr::n_distinct(.x) >= 4) {
+                         paste(sample(unique(na.omit(.x)), 3), collapse = ", ")
+                       } else {
+                         paste(unique(na.omit(.x)), collapse = ", ")
+                       }
+                     ))) %>%
+                     t() %>%
+                     as.data.frame %>%
+                     tibble::rownames_to_column() %>%
+                     magrittr::set_names("Column_Name","Column_Type","Missing_Values","Non_Missing_Values","Unique_Values","Example_Values"))
+
+  data_dict[["Variable_details"]] <- NA
+
+  # Loop through each row
+  for (i in 1:nrow(data_dict)) {
+    # Show the current row data (optional)
+    cat("\nCurrent row:\n")
+    print(data_dict[i,1 ])
+
+    # Prompt user for input
+    user_input <- readline(prompt = paste0("Variable info for: ", data_dict[i,1], ": "))
+
+    # Store the input
+    data_dict[i, "Variable_details"] <- user_input
+  }
+
+
+  # Create factor dictionaries
+  factor_dicts <- list()
+  factor_cols <- names(df)[sapply(df, is.factor)]
+
+  for (col in factor_cols) {
+    factor_levels <- levels(df[[col]])
+    factor_df <- data.frame(
+      `Factor value` = factor_levels,
+      Description = rep("", length(factor_levels)),
+      check.names = FALSE
+    )
+    factor_dicts[[col]] <- factor_df
+  }
+
+  # Create Excel workbook with formatting
+  wb <- openxlsx::createWorkbook()
+
+  # Add main dictionary sheet (red tab)
+  openxlsx::addWorksheet(wb, "Data Dictionary")
+  openxlsx::writeData(wb, "Data Dictionary", data_dict)
+
+  # Style definitions
+  header_style <- openxlsx::createStyle(
+    textDecoration = "bold",
+    border = "TopBottomLeftRight",
+    borderStyle = "medium"
+  )
+
+  body_style <- openxlsx::createStyle(
+    border = "TopBottomLeftRight",
+    borderStyle = "thin"
+  )
+
+  outer_border_style <- openxlsx::createStyle(
+    border = "TopBottomLeftRight",
+    borderStyle = "thin",
+    textDecoration = "bold",
+    fgFill = "#dddddd"
+  )
+
+  # Add factor sheets with formatting
+  # Create a single sheet for all factor dictionaries
+  sheet_name <- "Factor Dictionaries"
+  openxlsx::addWorksheet(wb, sheet_name)
+
+  # Initialize starting row
+  current_row <- 1
+
+  for (col_name in names(factor_dicts)) {
+    col_info <- data_dict$Variable_details[data_dict$Column_Name==col_name]
+
+    # Write variable name in current row
+    openxlsx::writeData(wb, sheet_name, x = col_name, startRow = current_row)
+    openxlsx::writeData(wb, sheet_name, x = col_info, startCol = 2, startRow = current_row)
+
+    # Increment row for the table
+    current_row <- current_row + 2
+
+    # Write factor table starting at current_row
+    openxlsx::writeData(
+      wb,
+      sheet_name,
+      x = factor_dicts[[col_name]],
+      startRow = current_row,
+      headerStyle = header_style
+    )
+
+    # Apply formatting to the current table
+    openxlsx::addStyle(
+      wb,
+      sheet_name,
+      style = outer_border_style,
+      rows = current_row:(current_row + nrow(factor_dicts[[col_name]]) - 1),
+      cols = 1:ncol(factor_dicts[[col_name]]),
+      gridExpand = TRUE
+    )
+
+    openxlsx::addStyle(
+      wb,
+      sheet_name,
+      style = body_style,
+      rows = (current_row + 1):(current_row + nrow(factor_dicts[[col_name]]) - 1),
+      cols = 1:ncol(factor_dicts[[col_name]]),
+      gridExpand = TRUE
+    )
+
+    # Update current_row to be 5 rows below the bottom of this table
+    current_row <- current_row + nrow(factor_dicts[[col_name]]) + 5
+  }
+
+  # Save workbook
+  openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  message(paste("Dictionary saved to:", output_file))
+}
+
+metadata(mtcars,"example.xlsx",4)
