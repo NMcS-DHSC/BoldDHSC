@@ -7,12 +7,11 @@
 #'
 #' @param df A dataframe, ideally of less than 50 columns
 #' @param output_file The filepath of the output xlsx file
-#' @param distinct_limit The limit on distinct values to use to determine if a column is a factor column. If the number of unique values in a column is less than distinct_limit, it will be assumed the column is a factor.
 #' @returns An xlsx document which is saved in the working directory. The first sheet is a summary of all of the columns in the data, and the second sheet is a lookup for each of the factors.
 #' @examples
-#' metadata(mtcars,"Example_output.xlsx",distinct_limit = 4)
+#' metadata(mtcars,"Example_output.xlsx")
 #'
-metadata <- function(df,output_file,distinct_limit=8) {
+metadata <- function(df,output_file) {
 
   if(substr(output_file,nchar(output_file)-4,nchar(output_file))!=".xlsx"){
     stop("The file name (output_file) must be a .xlsx file")
@@ -68,35 +67,6 @@ metadata <- function(df,output_file,distinct_limit=8) {
     message("Your dataframe has between 50 and 100 columns. This process will still work, but will look messy")
   }
 
-  df <- dplyr::mutate(df,across(
-      .cols = where(~dplyr::n_distinct(.) < distinct_limit),
-      .fns = as.factor
-    ))
-
-  suppressWarnings(data_dict <- dplyr::summarise(df, across(everything(), ~ list(
-                       type = class(.x),
-                       n_missing = sum(is.na(.x)),
-                       n_available = sum(!is.na(.x)),
-                       n_unique = dplyr::n_distinct(.x),
-                       example = if (dplyr::n_distinct(.x) >= 4) {
-                         paste(sample(unique(na.omit(.x)), 3), collapse = ", ")
-                       } else {
-                         paste(unique(na.omit(.x)), collapse = ", ")
-                       }
-                     ))))
-  data_dict <- as.data.frame(t(data_dict))
-  data_dict <- tibble::rownames_to_column(data_dict)
-  names(data_dict) <- c("Column_Name","Column_Type","Missing_Values","Non_Missing_Values","Unique_Values","Example_Values")
-
-  data_dict[["Variable_details"]] <- NA
-
-  if(ref_data_check){
-    data_dict <- dplyr::left_join(data_dict,ref_data,by=c("Column_Name"="Variable_name"))
-    data_dict <- dplyr::mutate(data_dict,Column_Type=ifelse(is.na(Variable_type),Column_Type,Variable_type))
-    data_dict <- dplyr::mutate(data_dict,Variable_details=ifelse(is.na(Variable_description),Variable_details,Variable_description))
-    data_dict <- dplyr::select(data_dict,-Variable_description,-Variable_type)
-  }
-
   convert_table_types <- function(data, ref_table) {
     for (col in ref_table$Variable_name) {
       desired_type <- ref_table$Variable_type[ref_table$Variable_name == col]
@@ -127,6 +97,41 @@ metadata <- function(df,output_file,distinct_limit=8) {
 
   df <- convert_table_types(df,ref_data)
 
+
+  suppressWarnings(data_dict <- dplyr::summarise(df, across(everything(), ~ list(
+                       type = class(.x),
+                       n_missing = sum(is.na(.x)),
+                       n_available = sum(!is.na(.x)),
+                       n_unique = dplyr::n_distinct(.x),
+                       example = if (dplyr::n_distinct(.x) >= 4){
+                         paste(sample(unique(na.omit(.x)), 3), collapse = ", ")
+                       } else {
+                         paste(unique(na.omit(.x)), collapse = ", ")
+                       },
+                       min = ifelse(is.numeric(.x),min(.x),NA),
+                       LQ = ifelse(is.numeric(.x),quantile(.x,0.25),NA),
+                       median = ifelse(is.numeric(.x),median(.x),NA),
+                       mean = ifelse(is.numeric(.x),mean(.x),NA),
+                       UQ = ifelse(is.numeric(.x),quantile(.x,0.75),NA),
+                       max = ifelse(is.numeric(.x),max(.x),NA)
+
+                     ))))
+  data_dict <- as.data.frame(t(data_dict))
+  data_dict <- tibble::rownames_to_column(data_dict)
+  names(data_dict) <- c("Column_Name","Column_Type","Missing_Values","Non_Missing_Values","Unique_Values","Example_Values","Min","LQ","Median","Mean","UQ","Max")
+
+  data_dict[["Variable_details"]] <- NA
+
+  if(ref_data_check){
+    data_dict <- dplyr::left_join(data_dict,ref_data,by=c("Column_Name"="Variable_name"))
+    data_dict <- dplyr::mutate(data_dict,Column_Type=ifelse(is.na(Variable_type),Column_Type,Variable_type))
+    data_dict <- dplyr::mutate(data_dict,Variable_details=ifelse(is.na(Variable_description),Variable_details,Variable_description))
+    data_dict <- dplyr::select(data_dict,-Variable_description,-Variable_type)
+  }
+
+
+
+
   # Loop through each row
   for (i in 1:nrow(data_dict)) {
     # Show the current row data (optional)
@@ -143,17 +148,23 @@ metadata <- function(df,output_file,distinct_limit=8) {
   }
 
 
-  # Create factor dictionaries
+  # Create factor dictionaries including count and percentage columns
   factor_dicts <- list()
   factor_cols <- names(df)[sapply(df, is.factor)]
 
   for (col in factor_cols) {
-    factor_levels <- levels(df[[col]])
+    # Compute frequency table including NAs
+    freq <- table(df[[col]], useNA = "ifany")
+
+    # Create a data frame from the frequency table
     factor_df <- data.frame(
-      `Factor value` = factor_levels,
-      Description = rep("", length(factor_levels)),
+      `Factor value` = names(freq),
+      Count = as.numeric(freq),
+      Percent = round(as.numeric(freq) / sum(freq) * 100, 2),
+      Description = rep("", length(freq)),
       check.names = FALSE
     )
+
     factor_dicts[[col]] <- factor_df
   }
 
@@ -171,12 +182,18 @@ metadata <- function(df,output_file,distinct_limit=8) {
                         "Non Missing",
                         "Unique Values",
                         "Example values",
+                        "Minimum",
+                        "Lower Quartile",
+                        "Median",
+                        "Mean",
+                        "Upper Quartile",
+                        "Maximum",
                         "Variable Description")
 
   # Add main dictionary sheet (red tab)
   openxlsx::addWorksheet(wb, "Data Dictionary")
-  openxlsx::writeDataTable(wb, "Data Dictionary", data_dict)
-  openxlsx::setColWidths(wb, "Data Dictionary",widths = column_widths,cols = 1:7)
+  openxlsx::writeData(wb, "Data Dictionary", data_dict,na.string = "")
+  openxlsx::setColWidths(wb, "Data Dictionary",widths = column_widths,cols = 1:13)
 
   # Style definitions
   header_style <- openxlsx::createStyle(
@@ -247,7 +264,34 @@ metadata <- function(df,output_file,distinct_limit=8) {
     current_row <- current_row + nrow(factor_dicts[[col_name]]) + 3
   }
 
+
+  # Createt a dataset which looks at completeness per field
+  completeness_df <- data.frame(
+    Variable = names(df),
+    Complete_Count = sapply(df, function(x) sum(!is.na(x))),
+    Total_Count = nrow(df),
+    Complete_Percent = round(sapply(df, function(x) mean(!is.na(x))) * 100, 2),
+    stringsAsFactors = FALSE
+  )
+
+  # Create the plot
+  my_plot <- ggplot2::ggplot(data = completeness_df, ggplot2::aes(x = Variable, y = Complete_Percent)) +
+    ggplot2::geom_point(color = "steelblue") +
+    ggplot2::labs(title = "Completeness", x = "", y = "")
+
+  # Save the plot as a PNG file
+  ggplot2::ggsave(filename = "my_plot.png", plot = my_plot, width = 6, height = 4, units = "in")
+
+
+  # Add a worksheet named "PlotSheet"
+  openxlsx::addWorksheet(wb, sheetName = "PlotSheet")
+
+  # Insert the image into the worksheet
+  openxlsx::insertImage(wb, sheet = "PlotSheet", file = "my_plot.png",
+                        startRow = 1, startCol = 1, width = 6, height = 4, units = "in")
+
   # Save workbook
   openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
   message(paste("Dictionary saved to:", output_file))
 }
+metadata(mtcars,"outputexample345.xlsx")
