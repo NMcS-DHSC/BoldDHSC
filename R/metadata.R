@@ -294,4 +294,3 @@ metadata <- function(df,output_file) {
   openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
   message(paste("Dictionary saved to:", output_file))
 }
-metadata(mtcars,"outputexample345.xlsx")

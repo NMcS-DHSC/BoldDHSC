@@ -4,14 +4,12 @@
 \alias{metadata}
 \title{Create an Excel data dictionary from a dataframe}
 \usage{
-metadata(df, output_file, distinct_limit = 8)
+metadata(df, output_file)
 }
 \arguments{
 \item{df}{A dataframe, ideally of less than 50 columns}
 
 \item{output_file}{The filepath of the output xlsx file}
-
-\item{distinct_limit}{The limit on distinct values to use to determine if a column is a factor column. If the number of unique values in a column is less than distinct_limit, it will be assumed the column is a factor.}
 }
 \value{
 An xlsx document which is saved in the working directory. The first sheet is a summary of all of the columns in the data, and the second sheet is a lookup for each of the factors.
@@ -23,6 +21,6 @@ This can either be done in-line as the function runs, or can be uploaded as part
 The file outputted also contains a sheet for the user to explicitly add value to factor columns.
 }
 \examples{
-metadata(mtcars,"Example_output.xlsx",distinct_limit = 4)
+metadata(mtcars,"Example_output.xlsx")
 
 }
