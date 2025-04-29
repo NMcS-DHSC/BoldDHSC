@@ -275,19 +275,25 @@ metadata <- function(df,output_file) {
   )
 
   # Create the plot
-  my_plot <- ggplot2::ggplot(data = completeness_df, ggplot2::aes(x = Variable, y = Complete_Percent)) +
-    ggplot2::geom_point(color = "steelblue") +
-    ggplot2::labs(title = "Completeness", x = "", y = "")
+  completeness_plot <- ggplot2::ggplot(data = completeness_df, ggplot2::aes(x = Variable, y = Complete_Percent)) +
+    ggplot2::geom_bar(stat = "identity", fill = "steelblue") +
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      title = "Missing Data Percentage by Variable",
+      x = "Variable",
+      y = "Missing Percentage (%)"
+    ) +
+    ggplot2::theme_minimal()
 
   # Save the plot as a PNG file
-  ggplot2::ggsave(filename = "my_plot.png", plot = my_plot, width = 6, height = 4, units = "in")
+  ggplot2::ggsave(filename = "completeness_plot.png", plot = completeness_plot, width = 6, height = 4, units = "in")
 
 
-  # Add a worksheet named "PlotSheet"
-  openxlsx::addWorksheet(wb, sheetName = "PlotSheet")
+  # Add a worksheet named "Completeness"
+  openxlsx::addWorksheet(wb, sheetName = "Completeness")
 
   # Insert the image into the worksheet
-  openxlsx::insertImage(wb, sheet = "PlotSheet", file = "my_plot.png",
+  openxlsx::insertImage(wb, sheet = "Completeness", file = "completeness_plot.png",
                         startRow = 1, startCol = 1, width = 6, height = 4, units = "in")
 
   # Save workbook
