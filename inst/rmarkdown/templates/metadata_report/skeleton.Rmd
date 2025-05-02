@@ -41,6 +41,7 @@ knitr::kable(meta_details,na="")
 ### Dataset columns
 ```{r columns_dataset, echo = FALSE}
 meta_columns <- meta_columns[!apply(meta_columns, 1, function(x) all(is.na(x))), ]
+meta_columns[is.na(meta_columns)] <- ""
 knitr::kable(meta_columns,na="")
 ```
 
@@ -48,8 +49,44 @@ knitr::kable(meta_columns,na="")
 ```{r factor_tables, results = 'asis',echo=FALSE}
 for (name in names(meta_factors_list)) {
   cat("####", name, "\n\n")
+  column_desc <- meta_columns$variable_name[meta_columns$variable_code==name]
+  cat(paste0("**",column_desc,"**"), "\n")
   df <- meta_factors_list[[name]]
   print(knitr::kable(df[order(tolower(as.character(df$code))),]))
 }
 ```
 
+### Key statistical info {.tabset}
+
+#### Boxplots {.tabset}
+```{r boxplots,results = 'asis',echo=FALSE,warning=FALSE}
+df <- params$dataset
+numeric_columns <- names(df)[sapply(df, is.numeric)]
+for (name in numeric_columns){
+  cat("#####", name, "\n\n")
+  bp <- ggplot2::ggplot(df, ggplot2::aes_string(x = name)) + 
+    ggplot2::geom_boxplot(fill = "skyblue", color = "black") + 
+    ggplot2::labs(title = paste("Boxplot of", name), x = name, y = "Value") + 
+    ggplot2::theme_minimal()
+ 
+  print(bp)
+
+  cat("\n\n")
+}
+```
+
+
+#### Histograms {.tabset}
+```{r histograms,results = 'asis',echo=FALSE,warning=FALSE}
+for (name in numeric_columns){
+  cat("#####", name, "\n\n")
+  hp <- ggplot2::ggplot(df, ggplot2::aes_string(x = name)) + 
+    ggplot2::geom_histogram(binwidth = 1, fill = "skyblue", color = "black") + 
+    ggplot2::labs(title = paste("Histogram of", name), x = name, y = "Frequency") + 
+    ggplot2::theme_minimal()
+ 
+  print(hp)
+
+  cat("\n\n")
+}
+```
