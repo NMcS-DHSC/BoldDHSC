@@ -2,7 +2,7 @@
 
 read_named_tables <- function(file_path) {
   # Get all sheet names
-  sheets <- excel_sheets(file_path)
+  sheets <- readxl::excel_sheets(file_path)
 
   # Return empty list if fewer than 6 sheets
   if (length(sheets) < 6) {
@@ -19,7 +19,7 @@ read_named_tables <- function(file_path) {
   for (sheet in sheets_to_read) {
     # Read cell B1 to get the table name
     #In the template, cell B1 should be the name of the column
-    table_name <- read_excel(file_path, sheet = sheet, range = "B1", col_names = FALSE)[[1,1]]
+    table_name <- readxl::read_excel(file_path, sheet = sheet, range = "B1", col_names = FALSE)[[1,1]]
 
     # Skip if table_name is NA or empty and return a warning message
     if (is.na(table_name) || table_name == "") {
@@ -31,8 +31,7 @@ read_named_tables <- function(file_path) {
     data <- readxl::read_excel(
       file_path,
       sheet = sheet,
-      skip = 2,
-      col_names = FALSE
+      skip = 2
     )
 
     # Remove rows where all data is NA
