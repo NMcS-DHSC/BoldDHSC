@@ -14,6 +14,9 @@ meta_summary <- readxl::read_excel(params$metadata_file, sheet = 3,range = "A1:B
 meta_details <-readxl::read_excel(params$metadata_file, sheet = 4,range = "A1:B6")
 meta_columns <- readxl::read_excel(params$metadata_file, sheet = 5)
 
+meta_factors_list <- read_named_tables(params$metadata_file)
+
+
 ```
 
 ## Sections {.tabset}
@@ -38,5 +41,13 @@ knitr::kable(meta_details,na="")
 ```{r columns_dataset, echo = FALSE}
 meta_columns <- meta_columns[!apply(meta_columns, 1, function(x) all(is.na(x))), ]
 knitr::kable(meta_columns,na="")
+```
+
+### Factor values {.tabset}
+```{r factor_tables, results = 'asis'}
+for (name in names(meta_factors_list)) {
+  cat("####", name, "\n\n")
+  print(knitr::kable(meta_factors_list[[name]], format = "html"))
+}
 ```
 
