@@ -1,0 +1,42 @@
+---
+title: "Dataset Metadata Report"
+output: html_document
+params:
+  dataset: NULL
+  metadata_file: NULL
+---
+
+```{r setup, include=FALSE}
+library(readxl)
+library(dplyr)
+library(knitr)
+meta_summary <- readxl::read_excel(params$metadata_file, sheet = 3,range = "A1:B10")
+meta_details <-readxl::read_excel(params$metadata_file, sheet = 4,range = "A1:B6")
+meta_columns <- readxl::read_excel(params$metadata_file, sheet = 5)
+
+```
+
+## Sections {.tabset}
+
+### Core Dataset info
+```{r core_dataset, echo = FALSE}
+meta_summary[] <- lapply(meta_summary, function(col) {
+  if (is.character(col)) gsub("[\r\n]", " ", col) else col
+})
+knitr::kable(meta_summary,na="")
+```
+
+### Dataset details
+```{r details_dataset, echo = FALSE}
+meta_details[] <- lapply(meta_details, function(col) {
+  if (is.character(col)) gsub("[\r\n]", " ", col) else col
+})
+knitr::kable(meta_details,na="")
+```
+
+### Dataset columns
+```{r columns_dataset, echo = FALSE}
+meta_columns <- meta_columns[!apply(meta_columns, 1, function(x) all(is.na(x))), ]
+knitr::kable(meta_columns,na="")
+```
+
