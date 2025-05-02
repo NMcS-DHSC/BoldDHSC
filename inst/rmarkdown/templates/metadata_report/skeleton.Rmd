@@ -1,9 +1,10 @@
 ---
-title: "Dataset Metadata Report"
+title: "`r params$title`"
 output: html_document
 params:
   dataset: NULL
   metadata_file: NULL
+  title: NULL
 ---
 
 ```{r setup, include=FALSE}
@@ -47,7 +48,8 @@ knitr::kable(meta_columns,na="")
 ```{r factor_tables, results = 'asis'}
 for (name in names(meta_factors_list)) {
   cat("####", name, "\n\n")
-  print(knitr::kable(meta_factors_list[[name]], format = "html"))
+  df <- meta_factors_list[[name]]
+  print(knitr::kable(df[order(tolower(as.character(df$code))),]))
 }
 ```
 
