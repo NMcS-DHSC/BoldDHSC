@@ -19,11 +19,11 @@ read_named_tables <- function(file_path) {
   for (sheet in sheets_to_read) {
     # Read cell B1 to get the table name
     #In the template, cell B1 should be the name of the column
-    table_name <- readxl::read_excel(file_path, sheet = sheet, range = "B1", col_names = FALSE)[[1,1]]
+    suppressMessages(table_name <- names(readxl::read_excel(file_path, sheet = sheet, n_max = 2))[2])
 
     # Skip if table_name is NA or empty and return a warning message
-    if (is.na(table_name) || table_name == "") {
-      print(paste0(sheet," not read due to missing value in cell B1"))
+    if (is.na(table_name) || table_name == ""|| table_name=="...2") {
+      warning(paste0("Sheet: ",sheet," not read due to missing value in cell B1"))
       next
     }
     # Read the data starting from third row
