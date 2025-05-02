@@ -4,7 +4,7 @@
 \alias{create_metadata_report}
 \title{Generate a Metadata Report}
 \usage{
-create_metadata_report(output_file = "metadata_report.html")
+create_metadata_report(output_file, reference_file = NULL)
 }
 \arguments{
 \item{output_file}{Name of the output file to render to (e.g., "report.html").}

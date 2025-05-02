@@ -45,7 +45,7 @@ knitr::kable(meta_columns,na="")
 ```
 
 ### Factor values {.tabset}
-```{r factor_tables, results = 'asis'}
+```{r factor_tables, results = 'asis',echo=FALSE}
 for (name in names(meta_factors_list)) {
   cat("####", name, "\n\n")
   df <- meta_factors_list[[name]]
