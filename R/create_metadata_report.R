@@ -4,7 +4,7 @@
 #' @param metadata_file Path to Excel file with metadata (2 sheets expected).
 #' @param output_file Name of the output file to render to (e.g., "report.html").
 #' @export
-create_metadata_report <- function(output_file,reference_file=NULL) {
+create_metadata_report <- function(df,output_file,reference_file=NULL) {
   if(!grepl(".html",output_file)){
     if(tools::file_path_sans_ext(output_file)==output_file){
       output_file = paste0(output_file,".html")
@@ -39,7 +39,8 @@ create_metadata_report <- function(output_file,reference_file=NULL) {
                     output_file = output_file,
                     params = list(
                       metadata_file = reference_file,
-                      title = output_name
+                      title = output_name,
+                      dataset = df
                     ),
                     envir = new.env(parent = globalenv()))
 }
