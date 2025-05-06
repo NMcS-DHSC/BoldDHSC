@@ -26,7 +26,7 @@ create_metadata_report <- function(df,output_file,reference_file=NULL) {
 
 
   if(!grepl("/",output_file)){
-    output_path_choose <- svDialogs::dlg_message("You have not selected a filepath for your output, do you wish to select a filepath",type="yesno")$res
+    output_path_choose <- svDialogs::dlg_message("You have not selected a folder for your output, do you wish to select an output folder",type="yesno")$res
     if(output_path_choose =="yes"){
       output_path <- svDialogs::dlg_dir(title = "Select Output location")$res
       output_file = paste0(output_path,"/",output_file)
