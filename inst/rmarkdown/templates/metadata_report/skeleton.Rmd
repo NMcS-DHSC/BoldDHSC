@@ -1,6 +1,8 @@
 ---
 title: "`r params$title`"
-output: html_document
+output: 
+  html_document:
+    df_print: paged
 params:
   dataset: NULL
   metadata_file: NULL
@@ -16,7 +18,7 @@ meta_details <-readxl::read_excel(params$metadata_file, sheet = 4,range = "A1:B6
 meta_columns <- readxl::read_excel(params$metadata_file, sheet = 5)
 
 meta_factors_list <- read_named_tables(params$metadata_file)
-
+df <- params$dataset
 
 ```
 
@@ -51,16 +53,16 @@ for (name in names(meta_factors_list)) {
   cat("####", name, "\n\n")
   column_desc <- meta_columns$variable_name[meta_columns$variable_code==name]
   cat(paste0("**",column_desc,"**"), "\n")
-  df <- meta_factors_list[[name]]
-  print(knitr::kable(df[order(tolower(as.character(df$code))),]))
+  df_temp <- meta_factors_list[[name]]
+  print(knitr::kable(df_temp[order(tolower(as.character(df_temp$code))),]))
 }
 ```
 
 ### Key statistical info {.tabset}
 
 #### Boxplots {.tabset}
-```{r boxplots,results = 'asis',echo=FALSE,warning=FALSE}
-df <- params$dataset
+```{r boxplots,results = 'asis',echo=FALSE}
+
 numeric_columns <- names(df)[sapply(df, is.numeric)]
 for (name in numeric_columns){
   cat("#####", name, "\n\n")
@@ -77,7 +79,7 @@ for (name in numeric_columns){
 
 
 #### Histograms {.tabset}
-```{r histograms,results = 'asis',echo=FALSE,warning=FALSE}
+```{r histograms,results = 'asis',echo=FALSE}
 for (name in numeric_columns){
   cat("#####", name, "\n\n")
   hp <- ggplot2::ggplot(df, ggplot2::aes_string(x = name)) + 
@@ -90,3 +92,48 @@ for (name in numeric_columns){
   cat("\n\n")
 }
 ```
+
+### Completion Rate {.tabset}
+
+#### Overall missingness
+```{r missingness, echo=FALSE}
+ # Createt a dataset which looks at completeness per field
+  completeness_df <- data.frame(
+    Variable = names(df),
+    Complete_Count = sapply(df, function(x) sum(!is.na(x))),
+    Total_Count = nrow(df),
+    Complete_Percent = round(sapply(df, function(x) mean(!is.na(x))) * 100, 2),
+    stringsAsFactors = FALSE
+  )
+
+  # Create the plot
+  completeness_plot <- ggplot2::ggplot(data = completeness_df, ggplot2::aes(x = Variable, y = Complete_Percent)) +
+    ggplot2::geom_bar(stat = "identity", fill = "steelblue") +
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      title = "Complete Data Percentage by Variable",
+      x = "Variable",
+      y = "Complete Percentage (%)"
+    ) +
+    ggplot2::theme_minimal()
+  
+  plotly::ggplotly(completeness_plot)
+
+```
+
+```{r heatmaps,results = 'asis',echo=FALSE}
+
+factor_columns <- names(df)[sapply(df, is.factor)]
+
+for (name in factor_columns){
+  cat("####", name, "\n\n")
+  hm <- plot_completeness_heatmap(df,name)
+  
+  hm_plotly <- plotly::ggplotly(hm)
+ 
+  print(hm_plotly)
+
+  cat("\n\n")
+}
+```
+
