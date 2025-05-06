@@ -1,8 +1,6 @@
 ---
 title: "`r params$title`"
-output: 
-  html_document:
-    df_print: paged
+output: html_document
 params:
   dataset: NULL
   metadata_file: NULL
@@ -128,10 +126,8 @@ factor_columns <- names(df)[sapply(df, is.factor)]
 for (name in factor_columns){
   cat("####", name, "\n\n")
   hm <- plot_completeness_heatmap(df,name)
-  
-  hm_plotly <- plotly::ggplotly(hm)
- 
-  print(hm_plotly)
+
+  print(hm)
 
   cat("\n\n")
 }
