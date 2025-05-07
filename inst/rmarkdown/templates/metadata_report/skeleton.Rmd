@@ -130,7 +130,7 @@ for (name in factor_columns){
   cat("####", name, "\n\n")
   hm <- plot_completeness_heatmap(df,name)
 
-  print(hm)
+  print(htmltools::tagList(plotly::ggplotly(hm)))
 
   cat("\n\n")
 }
