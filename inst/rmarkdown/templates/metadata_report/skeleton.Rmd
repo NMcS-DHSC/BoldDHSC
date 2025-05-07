@@ -19,6 +19,9 @@ meta_factors_list <- read_named_tables(params$metadata_file)
 df <- params$dataset
 
 ```
+```{r setup html, include=FALSE}
+htmltools::tagList(ggplotly(ggplot()))
+```
 
 ## Sections {.tabset}
 
